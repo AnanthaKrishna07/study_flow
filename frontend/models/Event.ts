@@ -3,8 +3,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 export interface IEvent extends Document {
   title: string;
   description?: string;
-  date: Date;
-  time: string;
+  dateTime: Date; // ✅ single field for both date & time
   type: "Exam" | "Meeting" | "Placement" | "Deadline" | "Other";
   location?: string;
   meetLink?: string;
@@ -16,11 +15,10 @@ const EventSchema: Schema<IEvent> = new Schema(
   {
     title: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
-    date: { type: Date, required: true },
-    time: { type: String, default: "09:00" },
+    dateTime: { type: Date, required: true }, // ✅ replaced date + time with one field
     type: {
       type: String,
-      enum: ["Exam", "Meeting", "Placement", "Deadline", "Other"],
+      enum: ["Exam", "Meeting", "Placement", "Deadline", "Other"], // ✅ fixed enum
       default: "Exam",
     },
     location: { type: String, trim: true },
@@ -35,6 +33,7 @@ const EventSchema: Schema<IEvent> = new Schema(
   { timestamps: true }
 );
 
+// ✅ Prevent model overwrite in dev (Hot Reload issue)
 const Event: Model<IEvent> =
   mongoose.models.Event || mongoose.model<IEvent>("Event", EventSchema);
 

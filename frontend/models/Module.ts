@@ -9,7 +9,7 @@ export interface ITopic {
 }
 
 export interface IModule extends Document {
-  userId: string; 
+  userId: string;
   subjectId: mongoose.Types.ObjectId;
   name: string;
   difficulty: "Easy" | "Medium" | "Hard";
@@ -21,37 +21,25 @@ export interface IModule extends Document {
 const TopicSchema = new Schema<ITopic>(
   {
     title: { type: String, required: true },
-    priority: {
-      type: String,
-      enum: ["Low", "Medium", "High"],
-      default: "Medium",
-    },
+    priority: { type: String, enum: ["Low", "Medium", "High"], default: "Medium" },
     dueDate: { type: Date },
     completed: { type: Boolean, default: false },
   },
-  { _id: true } 
+  { _id: true }
 );
 
 const ModuleSchema: Schema<IModule> = new Schema(
   {
     userId: { type: String, required: true },
-    subjectId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Subject",
-      required: true,
-    },
+    subjectId: { type: mongoose.Schema.Types.ObjectId, ref: "Subject", required: true },
     name: { type: String, required: true },
-    difficulty: {
-      type: String,
-      enum: ["Easy", "Medium", "Hard"],
-      default: "Medium",
-    },
+    difficulty: { type: String, enum: ["Easy", "Medium", "Hard"], default: "Medium" },
     estimatedHours: { type: Number, default: 2 },
     completed: { type: Boolean, default: false },
-    topics: { type: [TopicSchema], default: [] }, 
+    topics: { type: [TopicSchema], default: [] },
   },
   { timestamps: true }
 );
 
-export default mongoose.models.Module ||
+export default (mongoose.models.Module as mongoose.Model<IModule>) ||
   mongoose.model<IModule>("Module", ModuleSchema);

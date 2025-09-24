@@ -1,12 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Sidebar from '@/components/ui/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Clock, BookOpen, CheckCircle } from 'lucide-react';
+import { Clock, BookOpen, CheckCircle, Calendar } from 'lucide-react';
+
+type Topic = {
+  _id: string;
+  title: string;
+  priority: 'Low' | 'Medium' | 'High';
+  dueDate?: string;
+  completed: boolean;
+};
 
 type Module = {
   _id: string;
@@ -15,35 +23,34 @@ type Module = {
   difficulty: 'Easy' | 'Medium' | 'Hard';
   estimatedHours: number;
   completed: boolean;
-  importantTopics?: { topic: string; priority: 'Low' | 'Medium' | 'High'; dueDate?: string }[];
+  topics: Topic[];
 };
 
-type Subject = {
+type SubjectWithModules = {
   _id: string;
   name: string;
   color: string;
+  totalModules?: number;
+  completedModules?: number;
+  modules: Module[];
 };
 
 export default function SubjectDetailPage() {
   const params = useParams();
-  const router = useRouter();
-  const id = params?.id as string; 
+  const id = params?.id as string;
 
-  const [subject, setSubject] = useState<Subject | null>(null);
-  const [modules, setModules] = useState<Module[]>([]);
+  const [subject, setSubject] = useState<SubjectWithModules | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch subject + modules
+  // 🔹 Fetch subject with modules
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [subRes, modRes] = await Promise.all([
-          fetch(`/api/schedule/subjects/${id}`),
-          fetch(`/api/schedule/modules?subjectId=${id}`),
-        ]);
-
-        if (subRes.ok) setSubject(await subRes.json());
-        if (modRes.ok) setModules(await modRes.json());
+        const res = await fetch(`/api/schedule/${id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSubject(data);
+        }
       } catch (err) {
         console.error('Error fetching subject details:', err);
       } finally {
@@ -53,6 +60,7 @@ export default function SubjectDetailPage() {
     if (id) fetchData();
   }, [id]);
 
+  // 🔹 Toggle module completion
   const toggleCompletion = async (moduleId: string, completed: boolean) => {
     try {
       const res = await fetch(`/api/schedule/modules`, {
@@ -62,7 +70,16 @@ export default function SubjectDetailPage() {
       });
       if (res.ok) {
         const updated = await res.json();
-        setModules((prev) => prev.map((m) => (m._id === moduleId ? updated : m)));
+        setSubject((prev) =>
+          prev
+            ? {
+                ...prev,
+                modules: prev.modules.map((m) =>
+                  m._id === moduleId ? updated : m
+                ),
+              }
+            : prev
+        );
       }
     } catch (err) {
       console.error('Error updating module:', err);
@@ -71,10 +88,17 @@ export default function SubjectDetailPage() {
 
   const getBadgeColor = (difficulty: string) =>
     ({
-      Easy: 'bg-purple-100 text-purple-700',
-      Medium: 'bg-yellow-100 text-yellow-700',
-      Hard: 'bg-red-100 text-red-700',
+      Easy: 'bg-purple-100 text-purple-700 font-bold',
+      Medium: 'bg-yellow-100 text-yellow-700 font-bold',
+      Hard: 'bg-red-100 text-red-700 font-bold',
     }[difficulty] || 'bg-gray-100 text-gray-700');
+
+  const getPriorityColor = (priority: string) =>
+    ({
+      High: 'bg-red-100 text-red-700 font-semibold',
+      Medium: 'bg-yellow-100 text-yellow-700 font-semibold',
+      Low: 'bg-green-100 text-green-700 font-semibold',
+    }[priority] || 'bg-gray-100 text-gray-700');
 
   if (loading) {
     return (
@@ -112,12 +136,12 @@ export default function SubjectDetailPage() {
 
         {/* Modules Section */}
         <section className="space-y-6">
-          {modules.length === 0 ? (
+          {subject.modules.length === 0 ? (
             <Card className="bg-white/90 p-10 text-center">
               <p>No modules added yet.</p>
             </Card>
           ) : (
-            modules.map((m) => (
+            subject.modules.map((m) => (
               <Card key={m._id} className="bg-white/90 hover:shadow-lg transition">
                 <CardHeader className="flex justify-between items-center">
                   <CardTitle className="flex items-center gap-2">
@@ -142,34 +166,35 @@ export default function SubjectDetailPage() {
                     <Clock className="w-4 h-4" /> {m.estimatedHours} hrs
                   </p>
 
-                  {/* Important Topics */}
-                  {m.importantTopics && m.importantTopics.length > 0 && (
+                  {/* Topics */}
+                  {m.topics && m.topics.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="text-sm font-semibold text-gray-800">Important Topics</h4>
-                      {m.importantTopics.map((t, idx) => (
+                      <h4 className="text-sm font-semibold text-gray-800">Topics</h4>
+                      {m.topics.map((t) => (
                         <div
-                          key={idx}
+                          key={t._id}
                           className="flex justify-between items-center bg-gray-50 p-2 rounded border"
                         >
-                          <span className="text-gray-700">{t.topic}</span>
-                          <div className="flex gap-3 text-sm">
-                            <span
-                              className={`px-2 py-1 rounded-full ${
-                                t.priority === 'High'
-                                  ? 'bg-red-100 text-red-700'
-                                  : t.priority === 'Medium'
-                                  ? 'bg-yellow-100 text-yellow-700'
-                                  : 'bg-green-100 text-green-700'
+                          <div>
+                            <p
+                              className={`text-sm ${
+                                t.completed ? 'line-through text-gray-400' : 'text-gray-700'
                               }`}
                             >
-                              {t.priority}
-                            </span>
-                            {t.dueDate && (
-                              <span className="text-gray-500">
-                                {new Date(t.dueDate).toLocaleDateString()}
-                              </span>
-                            )}
+                              {t.title}
+                            </p>
+                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'No due date'}
+                            </p>
                           </div>
+                          <span
+                            className={`px-2 py-1 text-xs rounded ${getPriorityColor(
+                              t.priority
+                            )}`}
+                          >
+                            {t.priority}
+                          </span>
                         </div>
                       ))}
                     </div>

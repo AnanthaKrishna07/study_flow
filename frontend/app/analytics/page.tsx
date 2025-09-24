@@ -1,273 +1,210 @@
 'use client';
 
+import Sidebar from '@/components/ui/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { useApp } from '@/context/AppContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Target, AlertTriangle, BookOpen } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import {
+  TrendingUp,
+  Target,
+  AlertTriangle,
+  BookOpen,
+  Clock,
+  LineChart as LineChartIcon,
+} from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
 
 export default function Analytics() {
-  const { tasks = [], events = [], modules = [], subjects = [] } = useApp();
+  const [data, setData] = useState<any>(null);
 
-  // --- Task Stats ---
-  const taskStats = {
-    total: tasks.length,
-    completed: tasks.filter(t => t.completed).length,
-    pending: tasks.filter(t => !t.completed).length,
-    overdue: tasks.filter(t => !t.completed && new Date(t.dueDate) < new Date()).length,
-  };
+  useEffect(() => {
+    async function fetchData() {
+      const res = await fetch('/api/analytics');
+      const json = await res.json();
+      setData(json);
+    }
+    fetchData();
+  }, []);
 
-  const completionRate =
-    taskStats.total > 0
-      ? Math.round((taskStats.completed / taskStats.total) * 100)
-      : 0;
-
-  // --- Module Stats ---
-  const moduleStats = {
-    total: modules.length,
-    completed: modules.filter(m => m.completed).length,
-    easy: modules.filter(m => m.difficulty === 'Easy').length,
-    medium: modules.filter(m => m.difficulty === 'Medium').length,
-    hard: modules.filter(m => m.difficulty === 'Hard').length,
-  };
-
-  const moduleProgress =
-    moduleStats.total > 0
-      ? Math.round((moduleStats.completed / moduleStats.total) * 100)
-      : 0;
-
-  // --- Priority Data ---
-  const priorityData = [
-    { name: 'High', value: tasks.filter(t => t.priority === 'High').length, color: '#EF4444' },
-    { name: 'Medium', value: tasks.filter(t => t.priority === 'Medium').length, color: '#F59E0B' },
-    { name: 'Low', value: tasks.filter(t => t.priority === 'Low').length, color: '#10B981' },
-  ].filter(item => item.value > 0);
-
-  // --- Task Type Data ---
-  const taskTypeData = [
-    { name: 'Homework', value: tasks.filter(t => t.type === 'Homework').length },
-    { name: 'Assignment', value: tasks.filter(t => t.type === 'Assignment').length },
-    { name: 'Project', value: tasks.filter(t => t.type === 'Project').length },
-    { name: 'Reading', value: tasks.filter(t => t.type === 'Reading').length },
-    { name: 'Other', value: tasks.filter(t => t.type === 'Other').length },
-  ].filter(item => item.value > 0);
-
-  // --- Difficulty Data ---
-  const difficultyData = [
-    { name: 'Easy', value: moduleStats.easy, color: '#10B981' },
-    { name: 'Medium', value: moduleStats.medium, color: '#F59E0B' },
-    { name: 'Hard', value: moduleStats.hard, color: '#EF4444' },
-  ].filter(item => item.value > 0);
-
-  // --- Subject Progress ---
-  const subjectProgress = subjects.map(subject => {
-    const subjectModules = modules.filter(m => m.subjectId === subject.id);
-    const completedModules = subjectModules.filter(m => m.completed).length;
-    const progress =
-      subjectModules.length > 0
-        ? Math.round((completedModules / subjectModules.length) * 100)
-        : 0;
-    return {
-      name: subject.name,
-      progress,
-      total: subjectModules.length,
-      completed: completedModules,
-    };
-  });
+  if (!data) {
+    return <div className="flex items-center justify-center min-h-screen">Loading Analytics...</div>;
+  }
 
   return (
-    <div
-      className="min-h-screen bg-cover bg-center bg-no-repeat p-6"
-      style={{
-        backgroundImage:
-          "linear-gradient(rgba(255,255,255,0.92), rgba(255,255,255,0.92)), url('/images/aaa.jpg')",
-      }}
-    >
-      {/* Page Heading */}
-      <div>
-        <h1 className="text-4xl font-extrabold text-slate-800 mb-2 tracking-tight">
-          Study Analytics
-        </h1>
-        <p className="text-slate-600 text-lg">
-          Visualize your study progress and performance.
-        </p>
+    <div className="flex relative min-h-screen">
+      {/* Sidebar */}
+      <Sidebar />
+
+      {/* ✅ Background */}
+      <div className="absolute inset-0">
+        <img src="/images/aaa.jpg" alt="bg" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-white/70 backdrop-blur-md"></div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
-        <StatCard
-          title="Completion Rate"
-          value={`${completionRate}%`}
-          icon={TrendingUp}
-          color="blue"
-          change={`${taskStats.completed}/${taskStats.total} tasks`}
-        />
-        <StatCard
-          title="Module Progress"
-          value={`${moduleProgress}%`}
-          icon={Target}
-          color="green"
-          change={`${moduleStats.completed}/${moduleStats.total} modules`}
-        />
-        <StatCard
-          title="Active Subjects"
-          value={subjects.length}
-          icon={BookOpen}
-          color="purple"
-        />
-        <StatCard
-          title="Overdue Tasks"
-          value={taskStats.overdue}
-          icon={AlertTriangle}
-          color="red"
-        />
-      </div>
+      {/* Main */}
+      <main className="relative flex-1 ml-64 p-6 z-10 space-y-8">
+        {/* Heading */}
+        <div>
+          <h1 className="text-4xl font-extrabold text-slate-900 mb-2">Study Analytics</h1>
+          <p className="text-slate-700 text-lg">Visualize your study progress & performance.</p>
+        </div>
 
-      {/* Progress Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-        {/* Task Progress */}
-        <Card className="hover:shadow-lg transition-all duration-300">
-          <CardHeader>
-            <CardTitle>Task Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Overall Completion</span>
-              <span className="font-semibold">{completionRate}%</span>
-            </div>
-            <Progress value={completionRate} className="h-3" />
-          </CardContent>
-        </Card>
+        {/* Stat Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
+          <StatCard
+            title="Completion Rate"
+            value={`${data.taskStats.completionRate}%`}
+            icon={TrendingUp}
+            color="blue"
+            change={`${data.taskStats.completed}/${data.taskStats.total} tasks`}
+          />
+          <StatCard
+            title="Module Progress"
+            value={`${data.moduleStats.completionRate}%`}
+            icon={Target}
+            color="green"
+            change={`${data.moduleStats.completed}/${data.moduleStats.total} modules`}
+          />
+          <StatCard
+            title="Active Subjects"
+            value={data.subjectAllocation.length}
+            icon={BookOpen}
+            color="purple"
+          />
+          <StatCard
+            title="Overdue Tasks"
+            value={data.taskStats.overdue}
+            icon={AlertTriangle}
+            color="red"
+          />
+        </div>
 
-        {/* Module Progress */}
-        <Card className="hover:shadow-lg transition-all duration-300">
-          <CardHeader>
-            <CardTitle>Module Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Study Module Completion</span>
-              <span className="font-semibold">{moduleProgress}%</span>
-            </div>
-            <Progress value={moduleProgress} className="h-3" />
-          </CardContent>
-        </Card>
-      </div>
+        {/* 📊 Small Pie Charts */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
+          <AnalyticsPie title="Task Status" data={data.taskStatus} />
+          <AnalyticsPie title="Task Priority" data={data.priorityDist} />
+          <AnalyticsPie title="Task Types" data={data.taskTypeDist} />
+          <AnalyticsPie title="Module Difficulty" data={data.difficultyDist} />
+        </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-        {priorityData.length > 0 && (
-          <Card className="hover:shadow-md transition-all duration-300">
-            <CardHeader>
-              <CardTitle>Task Priority Distribution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={priorityData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    dataKey="value"
-                  >
-                    {priorityData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
+        {/* ⏰ Study Time */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+          <AnalyticsPie title="Weekly Study Time" data={data.studyTimeDist} icon={Clock} />
+        </div>
 
-        {taskTypeData.length > 0 && (
-          <Card className="hover:shadow-md transition-all duration-300">
-            <CardHeader>
-              <CardTitle>Task Type Distribution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={taskTypeData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#3B82F6" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Subject Progress */}
-      {subjectProgress.length > 0 && (
-        <Card className="mt-8 hover:shadow-md transition-all duration-300">
-          <CardHeader>
-            <CardTitle>Subject Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {subjectProgress.map((subject, index) => (
-              <div key={index} className="mb-4">
-                <div className="flex justify-between text-sm font-medium">
-                  <span>{subject.name}</span>
-                  <span>
-                    {subject.completed}/{subject.total} ({subject.progress}%)
-                  </span>
-                </div>
-                <Progress value={subject.progress} className="h-2" />
-              </div>
+        {/* 📚 Subject Progress */}
+        {data.subjectAllocation.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+            {data.subjectAllocation.map((s: any, idx: number) => (
+              <Card
+                key={idx}
+                className="bg-white/80 backdrop-blur-sm hover:shadow-md transition-all"
+              >
+                <CardHeader>
+                  <CardTitle>{s.name} Progress</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Completed', value: s.completedModules, color: '#10B981' },
+                          { name: 'Pending', value: s.totalModules - s.completedModules, color: '#EF4444' },
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label
+                        dataKey="value"
+                      >
+                        <Cell fill="#10B981" />
+                        <Cell fill="#EF4444" />
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
             ))}
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {/* Difficulty Distribution */}
-      {difficultyData.length > 0 && (
-        <Card className="mt-8 hover:shadow-md transition-all duration-300">
-          <CardHeader>
-            <CardTitle>Module Difficulty Distribution</CardTitle>
+        {/* 📈 Trend Chart */}
+        <Card className="bg-white/80 backdrop-blur-sm mt-8 hover:shadow-md">
+          <CardHeader className="flex items-center gap-2">
+            <LineChartIcon className="w-5 h-5 text-slate-600" />
+            <CardTitle>Weekly Progress Trend</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={difficultyData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  dataKey="value"
-                >
-                  {difficultyData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
+              <LineChart data={data.weeklyTrend}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="week" />
+                <YAxis />
                 <Tooltip />
-              </PieChart>
+                <Line
+                  type="monotone"
+                  dataKey="completedTasks"
+                  stroke="#10B981"
+                  strokeWidth={2}
+                  name="Tasks"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="completedModules"
+                  stroke="#3B82F6"
+                  strokeWidth={2}
+                  name="Modules"
+                />
+              </LineChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
-      )}
-
-      {/* Empty State */}
-      {tasks.length === 0 && modules.length === 0 && (
-        <Card className="mt-8 text-center py-12">
-          <TrendingUp className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            No data to analyze yet
-          </h3>
-          <p className="text-gray-600">
-            Add some tasks and modules to see your analytics here.
-          </p>
-        </Card>
-      )}
+      </main>
     </div>
+  );
+}
+
+/* ✅ Reusable Pie Chart */
+function AnalyticsPie({
+  title,
+  data,
+  icon: Icon,
+}: {
+  title: string;
+  data: any[];
+  icon?: any;
+}) {
+  if (!data || data.length === 0) return null;
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm hover:shadow-md transition-all">
+      <CardHeader className="flex items-center gap-2">
+        {Icon && <Icon className="w-5 h-5 text-slate-600" />}
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={220}>
+          <PieChart>
+            <Pie data={data} cx="50%" cy="50%" outerRadius={70} label dataKey="value">
+              {data.map((entry, idx) => (
+                <Cell key={idx} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip />
+          </PieChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
   );
 }

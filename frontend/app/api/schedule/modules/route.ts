@@ -4,23 +4,31 @@ import Module from "@/models/Module";
 import Subject from "@/models/Subject";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import mongoose from "mongoose";
 
 async function ensureAuth() {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user || !(session.user as any).id) {
-    return null;
-  }
+  if (!session || !session.user || !(session.user as any).id) return null;
   return session;
+}
+
+async function recalcSubjectProgress(subjectId: mongoose.Types.ObjectId | string) {
+
+  const subjectModules = await Module.find({ subjectId }).lean();
+  const totalModules = subjectModules.length;
+  const completedModules = subjectModules.filter((m) => m.completed).length;
+  await Subject.findByIdAndUpdate(subjectId, { totalModules, completedModules });
 }
 
 export async function GET() {
   try {
     await dbConnect();
     const session = await ensureAuth();
-    if (!session) return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    }
 
     const userId = (session.user as any).id;
-   
     const modules = await Module.find({ userId }).populate("subjectId").lean();
     return NextResponse.json(modules);
   } catch (err) {
@@ -33,38 +41,45 @@ export async function POST(req: Request) {
   try {
     await dbConnect();
     const session = await ensureAuth();
-    if (!session) return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    }
 
     const userId = (session.user as any).id;
     const body = await req.json();
 
-    
+ 
+    if (!body.name || !body.subjectId) {
+      return NextResponse.json({ message: "name and subjectId are required" }, { status: 400 });
+    }
+
+    const estimatedHours = Number(body.estimatedHours) || 1;
+
     const moduleData = {
       userId,
-      name: body.name,
       subjectId: body.subjectId,
+      name: body.name,
       difficulty: body.difficulty || "Medium",
-      estimatedHours: body.estimatedHours || 2,
-      completed: false,
-      topics: Array.isArray(body.topics) ? body.topics.map((t: any) => ({
-        title: t.title,
-        priority: t.priority || "Medium",
-        dueDate: t.dueDate ? new Date(t.dueDate) : undefined,
-        completed: !!t.completed,
-      })) : [],
+      estimatedHours,
+      completed: !!body.completed,
+      topics: Array.isArray(body.topics)
+        ? body.topics.map((t: any) => ({
+            title: t.title,
+            priority: t.priority || "Medium",
+            dueDate: t.dueDate ? new Date(t.dueDate) : undefined,
+            completed: !!t.completed,
+          }))
+        : [],
     };
 
     const created = await Module.create(moduleData);
 
-    
-    const subjectModules = await Module.find({ subjectId: body.subjectId });
-    const completedCount = subjectModules.filter((m) => m.completed).length;
-    await Subject.findByIdAndUpdate(body.subjectId, {
-      totalModules: subjectModules.length,
-      completedModules: completedCount,
-    });
+   
+    await recalcSubjectProgress(body.subjectId);
 
-    return NextResponse.json(created, { status: 201 });
+   
+    const populated = await Module.findById(created._id).populate("subjectId").lean();
+    return NextResponse.json(populated, { status: 201 });
   } catch (err) {
     console.error("POST module error:", err);
     return NextResponse.json({ message: "Error creating module" }, { status: 500 });
@@ -75,7 +90,9 @@ export async function PUT(req: Request) {
   try {
     await dbConnect();
     const session = await ensureAuth();
-    if (!session) return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    }
 
     const userId = (session.user as any).id;
     const body = await req.json();
@@ -86,26 +103,36 @@ export async function PUT(req: Request) {
 
    
     const module = await Module.findOne({ _id: body._id, userId });
-    if (!module) return NextResponse.json({ message: "Module not found" }, { status: 404 });
+    if (!module) {
+      return NextResponse.json({ message: "Module not found" }, { status: 404 });
+    }
 
     let changed = false;
 
   
     if (body.updateModule && typeof body.updateModule === "object") {
       const up = body.updateModule;
-      if (up.name !== undefined) module.name = up.name;
-      if (up.difficulty !== undefined) module.difficulty = up.difficulty;
-      if (up.estimatedHours !== undefined) module.estimatedHours = up.estimatedHours;
-      changed = true;
+      if (up.name !== undefined) {
+        module.name = up.name;
+        changed = true;
+      }
+      if (up.difficulty !== undefined) {
+        module.difficulty = up.difficulty;
+        changed = true;
+      }
+      if (up.estimatedHours !== undefined) {
+        module.estimatedHours = Number(up.estimatedHours) || module.estimatedHours;
+        changed = true;
+      }
     }
 
-    
+  
     if (typeof body.completed === "boolean") {
       module.completed = body.completed;
       changed = true;
     }
 
-
+ 
     if (body.newTopic && typeof body.newTopic === "object") {
       const nt = {
         title: body.newTopic.title,
@@ -113,13 +140,20 @@ export async function PUT(req: Request) {
         dueDate: body.newTopic.dueDate ? new Date(body.newTopic.dueDate) : undefined,
         completed: !!body.newTopic.completed,
       };
-      module.topics.push(nt);
+      module.topics.push(nt as any);
       changed = true;
     }
 
    
     if (body.topicId && body.topicUpdate) {
-      const topic = module.topics.id(body.topicId);
+      const topicIdStr = String(body.topicId);
+      
+      const topic = module.topics.find((t: any) => {
+       
+        if (!t) return false;
+        return String((t as any)._id) === topicIdStr;
+      });
+
       if (topic) {
         const tu = body.topicUpdate;
         if (tu.title !== undefined) topic.title = tu.title;
@@ -127,6 +161,9 @@ export async function PUT(req: Request) {
         if (tu.dueDate !== undefined) topic.dueDate = tu.dueDate ? new Date(tu.dueDate) : undefined;
         if (typeof tu.completed === "boolean") topic.completed = tu.completed;
         changed = true;
+      } else {
+        
+        return NextResponse.json({ message: "Topic not found in module" }, { status: 404 });
       }
     }
 
@@ -134,18 +171,14 @@ export async function PUT(req: Request) {
       return NextResponse.json({ message: "Nothing to update" }, { status: 400 });
     }
 
-    const saved = await module.save();
-
-
-    const subjectModules = await Module.find({ subjectId: saved.subjectId });
-    const completedCount = subjectModules.filter((m) => m.completed).length;
-    await Subject.findByIdAndUpdate(saved.subjectId, {
-      totalModules: subjectModules.length,
-      completedModules: completedCount,
-    });
+  
+    await module.save();
 
    
-    const populated = await Module.findById(saved._id).populate("subjectId").lean();
+    await recalcSubjectProgress(module.subjectId);
+
+   
+    const populated = await Module.findById(module._id).populate("subjectId").lean();
     return NextResponse.json(populated);
   } catch (err) {
     console.error("PUT module error:", err);
@@ -157,22 +190,24 @@ export async function DELETE(req: Request) {
   try {
     await dbConnect();
     const session = await ensureAuth();
-    if (!session) return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    }
 
     const userId = (session.user as any).id;
     const { _id } = await req.json();
-    if (!_id) return NextResponse.json({ message: "Module _id required" }, { status: 400 });
+
+    if (!_id) {
+      return NextResponse.json({ message: "Module _id required" }, { status: 400 });
+    }
 
     const deleted = await Module.findOneAndDelete({ _id, userId });
-    if (!deleted) return NextResponse.json({ message: "Module not found" }, { status: 404 });
+    if (!deleted) {
+      return NextResponse.json({ message: "Module not found" }, { status: 404 });
+    }
 
-    
-    const subjectModules = await Module.find({ subjectId: deleted.subjectId });
-    const completedCount = subjectModules.filter((m) => m.completed).length;
-    await Subject.findByIdAndUpdate(deleted.subjectId, {
-      totalModules: subjectModules.length,
-      completedModules: completedCount,
-    });
+   
+    await recalcSubjectProgress(deleted.subjectId);
 
     return NextResponse.json({ message: "Module deleted successfully" });
   } catch (err) {

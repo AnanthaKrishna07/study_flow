@@ -29,7 +29,7 @@ export default function LoginPage() {
     if (res?.error) {
       setError(res.error);
     } else {
-      // ✅ Fetch session to check role
+      
       const sessionRes = await fetch('/api/auth/session');
       const session = await sessionRes.json();
 
@@ -70,7 +70,7 @@ export default function LoginPage() {
               <label className="block text-sm font-medium">Email</label>
               <input
                 type="email"
-                placeholder="you@example.com"
+                placeholder="Enter your Email"
                 className="w-full mt-1 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-black"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

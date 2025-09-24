@@ -1,3 +1,4 @@
+// models/Subject.ts
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface ISubject extends Document {
@@ -5,7 +6,7 @@ export interface ISubject extends Document {
   color: string;
   totalModules: number;
   completedModules: number;
-  userId: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId | string;
 }
 
 const SubjectSchema: Schema<ISubject> = new Schema(
@@ -19,4 +20,5 @@ const SubjectSchema: Schema<ISubject> = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.models.Subject || mongoose.model<ISubject>("Subject", SubjectSchema);
+export default (mongoose.models.Subject as mongoose.Model<ISubject>) ||
+  mongoose.model<ISubject>("Subject", SubjectSchema);
