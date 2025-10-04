@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "frontend/app/api/tasks/reminders/route.ts": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/tasks/reminders",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
