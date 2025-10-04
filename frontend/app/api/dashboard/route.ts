@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/mongodb";
 import Task from "@/models/Task";
 import Event from "@/models/Event";
+import Module from "@/models/Module";
 
 export async function GET() {
   try {
@@ -19,19 +20,20 @@ export async function GET() {
     await dbConnect();
     const userId = (session.user as any).id;
 
-    
-    const [allTasks, allEvents] = await Promise.all([
+    // ✅ Fetch tasks, events, modules together
+    const [allTasks, allEvents, allModules] = await Promise.all([
       Task.find({ userId }).sort({ dueDate: 1 }).lean(),
       Event.find({ userId }).sort({ dateTime: 1 }).lean(),
+      Module.find({ userId }).lean(),
     ]);
 
+    // Dates for today / tomorrow
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-   
+    // ✅ Task stats
     const totalTasks = allTasks.length;
     const completedTasks = allTasks.filter((t) => t.completed).length;
     const todayTasks = allTasks.filter(
@@ -41,18 +43,22 @@ export async function GET() {
         new Date(t.dueDate) < tomorrow
     ).length;
 
-   
+    // ✅ Event stats
     const upcomingEvents = allEvents.filter(
       (e) => e.dateTime && new Date(e.dateTime) >= today
     ).length;
+
+    // ✅ Module stats
+    const totalModules = allModules.length;
+    const completedModules = allModules.filter((m) => m.completed).length;
 
     const stats = {
       totalTasks,
       completedTasks,
       todayTasks,
       upcomingEvents,
-      completedModules: 0, 
-      totalModules: 0,
+      completedModules,
+      totalModules,
     };
 
     return NextResponse.json({

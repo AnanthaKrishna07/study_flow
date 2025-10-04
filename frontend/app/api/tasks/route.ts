@@ -4,7 +4,6 @@ import Task from "@/models/Task";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-
 export async function GET() {
   try {
     await dbConnect();
@@ -27,7 +26,6 @@ export async function GET() {
   }
 }
 
-
 export async function POST(req: Request) {
   try {
     await dbConnect();
@@ -38,6 +36,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
+
     const task = await Task.create({
       userId: (session.user as any).id,
       title: body.title,
@@ -45,8 +44,13 @@ export async function POST(req: Request) {
       description: body.description || "",
       dueDate: body.dueDate,
       priority: body.priority || "Medium",
+      type: body.type || "Other",
       completed: false,
-      completedAt: null, 
+      completedAt: null,
+
+      // 🔔 Reminder defaults
+      reminderSent: false,
+      reminderSentAt: null,
     });
 
     return NextResponse.json(task, { status: 201 });

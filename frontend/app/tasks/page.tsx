@@ -21,6 +21,7 @@ type Task = {
   dueDate?: string;
   priority: 'Low' | 'Medium' | 'High';
   completed: boolean;
+  reminderSent?: boolean;
 };
 
 export default function TasksPage() {
@@ -37,6 +38,7 @@ export default function TasksPage() {
   });
   const [showForm, setShowForm] = useState(false);
 
+  // Fetch tasks initially
   useEffect(() => {
     const fetchTasks = async () => {
       const res = await fetch('/api/tasks');
@@ -46,6 +48,25 @@ export default function TasksPage() {
       }
     };
     fetchTasks();
+  }, []);
+
+  // 🔔 Auto-check for reminders every 1 minute
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/tasks/reminders');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.count > 0) {
+            alert(`📧 ${data.count} reminder(s) were just sent to your email.`);
+          }
+        }
+      } catch (err) {
+        console.error('Reminder check failed', err);
+      }
+    }, 60 * 1000); // every 1 min
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleAddTask = async () => {
@@ -108,7 +129,7 @@ export default function TasksPage() {
       {/* Background Image */}
       <div className="absolute inset-0 -z-10">
         <img
-          src="/images/aaa.jpg" // ✅ Put your image in /public folder
+          src="/images/aaa.jpg"
           alt="background"
           className="w-full h-full object-cover"
         />
@@ -120,10 +141,14 @@ export default function TasksPage() {
 
       {/* Main Content */}
       <main className="ml-64 flex-1 p-6">
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">Tasks</h1>
-        <p className="text-slate-600 mb-6">
-          Organize and manage your study tasks effectively
-        </p>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800 mb-1">Tasks</h1>
+            <p className="text-slate-600">
+              Organize and manage your study tasks effectively
+            </p>
+          </div>
+        </div>
 
         {/* Filters & Add button */}
         <div className="flex gap-2 mb-6 flex-wrap">

@@ -8,7 +8,6 @@ type Params = {
   params: { id: string };
 };
 
-
 export async function PUT(req: Request, { params }: Params) {
   try {
     await dbConnect();
@@ -20,9 +19,14 @@ export async function PUT(req: Request, { params }: Params) {
 
     const body = await req.json();
 
-    
+    // 🔹 Handle completion timestamp
     if (typeof body.completed !== "undefined") {
       body.completedAt = body.completed ? new Date() : null;
+    }
+
+    // 🔹 Handle reminder timestamp
+    if (typeof body.reminderSent !== "undefined") {
+      body.reminderSentAt = body.reminderSent ? new Date() : null;
     }
 
     const updated = await Task.findOneAndUpdate(
@@ -44,7 +48,6 @@ export async function PUT(req: Request, { params }: Params) {
     );
   }
 }
-
 
 export async function DELETE(req: Request, { params }: Params) {
   try {

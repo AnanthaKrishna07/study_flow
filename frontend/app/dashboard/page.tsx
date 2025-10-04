@@ -124,21 +124,17 @@ export default function Dashboard() {
 
   return (
     <div className="flex relative">
-      {/* Sidebar */}
       <Sidebar />
 
-      {/* ✅ Background Image with Blur Effect */}
       <div className="absolute inset-0 -z-10">
         <img
           src="/images/aaa.jpg" 
           alt="Dashboard Background"
           className="w-full h-full object-cover opacity-30"
         />
-        {/* Glassy overlay for blur */}
         <div className="absolute inset-0 backdrop-blur-md bg-white/30" />
       </div>
 
-      {/* Main Content */}
       <main className="flex-1 ml-64 p-6 min-h-screen relative z-10">
         <div>
           <h1 className="text-4xl font-extrabold text-slate-800 mb-2 tracking-tight">
@@ -149,7 +145,6 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Loading / Error */}
         {loading && (
           <Card className="mb-6">
             <CardContent className="py-8 text-center text-slate-600">
@@ -165,16 +160,16 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* Stats Grid */}
         {!loading && !error && (
           <>
+            {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatCard
                 title="Total Tasks"
-                value={stats.totalTasks}
+                value={`${stats.completedTasks}/${stats.totalTasks}`}
                 icon={CheckSquare}
                 color="blue"
-                change={`${stats.completedTasks} completed`}
+                change={`${completionRate}% completed`}
               />
               <StatCard
                 title="Today's Tasks"
@@ -231,19 +226,23 @@ export default function Dashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Module Progress</span>
-                      <span className="font-semibold">{moduleProgress}%</span>
+                  {stats.totalModules === 0 ? (
+                    <p className="text-gray-500 text-center py-4">No modules added yet</p>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Module Progress</span>
+                        <span className="font-semibold">{moduleProgress}%</span>
+                      </div>
+                      <Progress value={moduleProgress} className="h-2" />
+                      <div className="flex justify-between text-sm text-gray-500">
+                        <span>{stats.completedModules} completed</span>
+                        <span>
+                          {Math.max(stats.totalModules - stats.completedModules, 0)} remaining
+                        </span>
+                      </div>
                     </div>
-                    <Progress value={moduleProgress} className="h-2" />
-                    <div className="flex justify-between text-sm text-gray-500">
-                      <span>{stats.completedModules} completed</span>
-                      <span>
-                        {Math.max(stats.totalModules - stats.completedModules, 0)} remaining
-                      </span>
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -346,7 +345,6 @@ export default function Dashboard() {
               </Card>
             </div>
 
-            {/* Quick Add */}
             <div className="mt-8">
               <QuickAdd />
             </div>

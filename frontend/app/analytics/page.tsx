@@ -14,14 +14,16 @@ import {
   CartesianGrid,
   XAxis,
   YAxis,
+  BarChart,
+  Bar,
 } from 'recharts';
 import {
   TrendingUp,
   Target,
   AlertTriangle,
-  BookOpen,
-  Clock,
   LineChart as LineChartIcon,
+  CalendarClock,
+  Timer,
 } from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
 
@@ -46,7 +48,7 @@ export default function Analytics() {
       {/* Sidebar */}
       <Sidebar />
 
-      {/* ✅ Background */}
+      {/* Background */}
       <div className="absolute inset-0">
         <img src="/images/aaa.jpg" alt="bg" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-white/70 backdrop-blur-md"></div>
@@ -57,11 +59,11 @@ export default function Analytics() {
         {/* Heading */}
         <div>
           <h1 className="text-4xl font-extrabold text-slate-900 mb-2">Study Analytics</h1>
-          <p className="text-slate-700 text-lg">Visualize your study progress & performance.</p>
+          <p className="text-slate-700 text-lg">Track study progress, habits, and time management.</p>
         </div>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
           <StatCard
             title="Completion Rate"
             value={`${data.taskStats.completionRate}%`}
@@ -77,12 +79,6 @@ export default function Analytics() {
             change={`${data.moduleStats.completed}/${data.moduleStats.total} modules`}
           />
           <StatCard
-            title="Active Subjects"
-            value={data.subjectAllocation.length}
-            icon={BookOpen}
-            color="purple"
-          />
-          <StatCard
             title="Overdue Tasks"
             value={data.taskStats.overdue}
             icon={AlertTriangle}
@@ -90,84 +86,80 @@ export default function Analytics() {
           />
         </div>
 
-        {/* 📊 Small Pie Charts */}
+        {/* 4 Small Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
-          <AnalyticsPie title="Task Status" data={data.taskStatus} />
-          <AnalyticsPie title="Task Priority" data={data.priorityDist} />
-          <AnalyticsPie title="Task Types" data={data.taskTypeDist} />
-          <AnalyticsPie title="Module Difficulty" data={data.difficultyDist} />
+          <AnalyticsPie title="Task Status Distribution" data={data.taskStatus} />
+          <AnalyticsPie title="Module Difficulty Levels" data={data.difficultyDist} />
+          <AnalyticsLine
+            title="Task Completion Trend"
+            data={data.weeklyTrend}
+            xKey="week"
+            yKey="completedTasks"
+            color="#10B981"
+          />
+          <AnalyticsBar
+            title="Module Progress by Subject"
+            data={data.subjectAllocation.map((s: any) => ({
+              name: s.name,
+              completed: s.completedModules,
+              total: s.totalModules,
+            }))}
+          />
         </div>
 
-        {/* ⏰ Study Time */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-          <AnalyticsPie title="Weekly Study Time" data={data.studyTimeDist} icon={Clock} />
-        </div>
-
-        {/* 📚 Subject Progress */}
-        {data.subjectAllocation.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-            {data.subjectAllocation.map((s: any, idx: number) => (
-              <Card
-                key={idx}
-                className="bg-white/80 backdrop-blur-sm hover:shadow-md transition-all"
-              >
-                <CardHeader>
-                  <CardTitle>{s.name} Progress</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: 'Completed', value: s.completedModules, color: '#10B981' },
-                          { name: 'Pending', value: s.totalModules - s.completedModules, color: '#EF4444' },
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        label
-                        dataKey="value"
-                      >
-                        <Cell fill="#10B981" />
-                        <Cell fill="#EF4444" />
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {/* 📈 Trend Chart */}
+        {/* Study Hours */}
         <Card className="bg-white/80 backdrop-blur-sm mt-8 hover:shadow-md">
           <CardHeader className="flex items-center gap-2">
-            <LineChartIcon className="w-5 h-5 text-slate-600" />
-            <CardTitle>Weekly Progress Trend</CardTitle>
+            <Timer className="w-5 h-5 text-slate-600" />
+            <CardTitle>Planned vs Actual Study Hours</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={data.weeklyTrend}>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={data.studyHours}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" />
+                <XAxis dataKey="day" />
                 <YAxis />
                 <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="completedTasks"
-                  stroke="#10B981"
-                  strokeWidth={2}
-                  name="Tasks"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="completedModules"
-                  stroke="#3B82F6"
-                  strokeWidth={2}
-                  name="Modules"
-                />
-              </LineChart>
+                <Bar dataKey="planned" fill="#3B82F6" name="Planned Hours" />
+                <Bar dataKey="actual" fill="#10B981" name="Actual Hours" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Deadlines */}
+        <Card className="bg-white/80 backdrop-blur-sm mt-8 hover:shadow-md">
+          <CardHeader className="flex items-center gap-2">
+            <CalendarClock className="w-5 h-5 text-slate-600" />
+            <CardTitle>Upcoming Deadlines</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={data.deadlinePressure}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="range" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="tasks" fill="#F59E0B" name="Tasks Due" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Productivity */}
+        <Card className="bg-white/80 backdrop-blur-sm mt-8 hover:shadow-md">
+          <CardHeader>
+            <CardTitle>Productivity by Time of Day (from Schedule)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={data.studyScheduleProductivity}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="time" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="sessions" fill="#6366F1" name="Study Sessions" />
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -176,21 +168,12 @@ export default function Analytics() {
   );
 }
 
-/* ✅ Reusable Pie Chart */
-function AnalyticsPie({
-  title,
-  data,
-  icon: Icon,
-}: {
-  title: string;
-  data: any[];
-  icon?: any;
-}) {
+/* ✅ Pie Chart */
+function AnalyticsPie({ title, data }: { title: string; data: any[] }) {
   if (!data || data.length === 0) return null;
   return (
     <Card className="bg-white/80 backdrop-blur-sm hover:shadow-md transition-all">
-      <CardHeader className="flex items-center gap-2">
-        {Icon && <Icon className="w-5 h-5 text-slate-600" />}
+      <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent>
@@ -203,6 +186,65 @@ function AnalyticsPie({
             </Pie>
             <Tooltip />
           </PieChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ✅ Line Chart */
+function AnalyticsLine({
+  title,
+  data,
+  xKey,
+  yKey,
+  color,
+}: {
+  title: string;
+  data: any[];
+  xKey: string;
+  yKey: string;
+  color: string;
+}) {
+  if (!data || data.length === 0) return null;
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm hover:shadow-md transition-all">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={220}>
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey={xKey} />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey={yKey} stroke={color} strokeWidth={2} />
+          </LineChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ✅ Bar Chart */
+function AnalyticsBar({ title, data }: { title: string; data: any[] }) {
+  if (!data || data.length === 0) return null;
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm hover:shadow-md transition-all">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="completed" fill="#10B981" name="Completed Modules" />
+            <Bar dataKey="total" fill="#3B82F6" name="Total Modules" />
+          </BarChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>

@@ -1,3 +1,4 @@
+// app/api/events/route.ts
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Event from "@/models/Event";
@@ -10,11 +11,16 @@ async function ensureAuth() {
   return session;
 }
 
+/**
+ * GET - List events for the user (optional ?upcoming=true&from&to)
+ */
 export async function GET(req: Request) {
   try {
     await dbConnect();
     const session = await ensureAuth();
-    if (!session) return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    }
 
     const userId = (session.user as any).id;
     const url = new URL(req.url);
@@ -25,12 +31,10 @@ export async function GET(req: Request) {
 
     const query: any = { userId };
 
-    // If client asks for upcoming events
     if (upcoming === "true") {
       query.dateTime = { $gte: new Date() };
     }
 
-    // Range filter (from / to)
     if (from || to) {
       query.dateTime = query.dateTime || {};
       if (from) {
@@ -45,53 +49,43 @@ export async function GET(req: Request) {
       }
     }
 
-    // Try to return events sorted by dateTime (if exists)
-    // If your model uses `date` instead of `dateTime` adjust accordingly.
     const events = await Event.find(query).sort({ dateTime: 1 }).lean();
     return NextResponse.json(events);
   } catch (err) {
-    console.error("GET events error:", err);
+    console.error("❌ GET events error:", err);
     return NextResponse.json({ message: "Error fetching events" }, { status: 500 });
   }
 }
 
+/**
+ * POST - create a new event
+ */
 export async function POST(req: Request) {
   try {
     await dbConnect();
     const session = await ensureAuth();
-    if (!session) return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    }
 
     const userId = (session.user as any).id;
     const body = await req.json();
 
-    if (!body.title) {
-      return NextResponse.json({ message: "Title is required" }, { status: 400 });
+    if (!body.title || !body.date) {
+      return NextResponse.json({ message: "Title and date are required" }, { status: 400 });
     }
 
-    // Build dateTime from possible inputs
-    let dateTime: Date | null = null;
-    if (body.dateTime) {
-      dateTime = new Date(body.dateTime);
-    } else if (body.date && body.time) {
-      dateTime = new Date(`${body.date}T${body.time}`);
-    } else if (body.date) {
-      const d = new Date(body.date);
-      d.setHours(0, 0, 0, 0);
-      dateTime = d;
-    } else {
-      return NextResponse.json({ message: "date or dateTime (and optionally time) required" }, { status: 400 });
-    }
-
-    if (!dateTime || isNaN(dateTime.getTime())) {
-      return NextResponse.json({ message: "Invalid date/time provided" }, { status: 400 });
+    const dateTime = new Date(body.time ? `${body.date}T${body.time}` : body.date);
+    if (isNaN(dateTime.getTime())) {
+      return NextResponse.json({ message: "Invalid date/time" }, { status: 400 });
     }
 
     const evt = await Event.create({
       userId,
       title: body.title,
       description: body.description || "",
-      dateTime, // store unified dateTime field
-      time: body.time || undefined,
+      dateTime,
+      time: body.time || "", // explicitly store `time`
       type: body.type || "Other",
       location: body.location || "",
       meetLink: body.meetLink || "",
@@ -100,16 +94,21 @@ export async function POST(req: Request) {
 
     return NextResponse.json(evt, { status: 201 });
   } catch (err) {
-    console.error("POST events error:", err);
+    console.error("❌ POST events error:", err);
     return NextResponse.json({ message: "Error creating event" }, { status: 500 });
   }
 }
 
+/**
+ * PUT - update event
+ */
 export async function PUT(req: Request) {
   try {
     await dbConnect();
     const session = await ensureAuth();
-    if (!session) return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    }
 
     const userId = (session.user as any).id;
     const body = await req.json();
@@ -118,84 +117,72 @@ export async function PUT(req: Request) {
       return NextResponse.json({ message: "Event _id required" }, { status: 400 });
     }
 
-    const update: any = {};
+    const existing = await Event.findOne({ _id: body._id, userId });
+    if (!existing) {
+      return NextResponse.json({ message: "Event not found" }, { status: 404 });
+    }
 
+    const update: any = {};
     if (body.title !== undefined) update.title = body.title;
     if (body.description !== undefined) update.description = body.description;
     if (body.type !== undefined) update.type = body.type;
     if (body.location !== undefined) update.location = body.location;
     if (body.meetLink !== undefined) update.meetLink = body.meetLink;
     if (typeof body.reminderEnabled === "boolean") update.reminderEnabled = body.reminderEnabled;
-    if (body.time !== undefined) update.time = body.time;
 
-    // If client sends explicit dateTime
-    if (body.dateTime) {
-      const dt = new Date(body.dateTime);
-      if (isNaN(dt.getTime())) return NextResponse.json({ message: "Invalid dateTime" }, { status: 400 });
-      update.dateTime = dt;
-    } else if (body.date || body.time) {
-      // If partially updating date/time we need to fetch existing event first
-      const existing = await Event.findOne({ _id: body._id, userId });
-      if (!existing) return NextResponse.json({ message: "Event not found" }, { status: 404 });
-
-      // baseDate can be stored as `dateTime` or `date` in older data — support both
-      let baseDate: Date | null = null;
-      if (existing.dateTime) baseDate = new Date(existing.dateTime);
-      else if ((existing as any).date) baseDate = new Date((existing as any).date);
-      else baseDate = new Date(); // fallback
-
-      // ensure it's a valid Date object
-      baseDate = new Date(baseDate);
-      if (isNaN(baseDate.getTime())) baseDate = new Date();
-
-      // If `date` provided, replace Y-M-D but keep time portion from baseDate (or set to 00:00 if not present)
-      if (body.date) {
-        const tmp = new Date(body.date);
-        tmp.setHours(baseDate.getHours(), baseDate.getMinutes(), baseDate.getSeconds(), baseDate.getMilliseconds());
-        baseDate = tmp;
+    // handle date/time updates
+    let baseDate = existing.dateTime ? new Date(existing.dateTime) : new Date();
+    if (body.date) {
+      const tmp = new Date(body.date);
+      tmp.setHours(baseDate.getHours(), baseDate.getMinutes());
+      baseDate = tmp;
+    }
+    if (body.time) {
+      const [hh, mm] = (body.time || "").split(":").map((x: string) => parseInt(x, 10));
+      if (!isNaN(hh) && !isNaN(mm)) {
+        baseDate.setHours(hh, mm, 0, 0);
       }
+    }
 
-      // If `time` provided set HH:MM of baseDate
-      if (body.time) {
-        const [hhRaw, mmRaw] = (body.time || "").split(":").map((x: string) => parseInt(x, 10));
-        const hh = Number.isFinite(hhRaw) ? hhRaw : NaN;
-        const mm = Number.isFinite(mmRaw) ? mmRaw : NaN;
-        if (!isNaN(hh) && !isNaN(mm)) {
-          baseDate.setHours(hh, mm, 0, 0);
-        }
-      }
-
+    if (body.date || body.time) {
       update.dateTime = baseDate;
+      update.time = body.time ?? (existing as any).time ?? "";
     }
 
     const updated = await Event.findOneAndUpdate({ _id: body._id, userId }, update, { new: true });
-    if (!updated) return NextResponse.json({ message: "Event not found" }, { status: 404 });
-
-    return NextResponse.json(updated);
+    return updated
+      ? NextResponse.json(updated)
+      : NextResponse.json({ message: "Event not found" }, { status: 404 });
   } catch (err) {
-    console.error("PUT events error:", err);
+    console.error("❌ PUT events error:", err);
     return NextResponse.json({ message: "Error updating event" }, { status: 500 });
   }
 }
 
+/**
+ * DELETE - delete event
+ */
 export async function DELETE(req: Request) {
   try {
     await dbConnect();
     const session = await ensureAuth();
-    if (!session) return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    }
 
     const userId = (session.user as any).id;
     const body = await req.json();
-    const _id = body._id;
 
-    if (!_id) return NextResponse.json({ message: "Event _id required" }, { status: 400 });
+    if (!body._id) {
+      return NextResponse.json({ message: "Event _id required" }, { status: 400 });
+    }
 
-    const deleted = await Event.findOneAndDelete({ _id, userId });
-    if (!deleted) return NextResponse.json({ message: "Event not found" }, { status: 404 });
-
-    return NextResponse.json({ message: "Event deleted successfully" });
+    const deleted = await Event.findOneAndDelete({ _id: body._id, userId });
+    return deleted
+      ? NextResponse.json({ message: "Event deleted successfully" })
+      : NextResponse.json({ message: "Event not found" }, { status: 404 });
   } catch (err) {
-    console.error("DELETE events error:", err);
+    console.error("❌ DELETE events error:", err);
     return NextResponse.json({ message: "Error deleting event" }, { status: 500 });
   }
 }
