@@ -1,4 +1,4 @@
-'use client';
+'use client'; 
 
 import Image from 'next/image';
 import Link from 'next/link';
@@ -58,7 +58,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md bg-white/90 backdrop-blur-md p-8 rounded-2xl shadow-xl space-y-6">
           <div className="text-center">
             <h2 className="text-3xl font-extrabold text-blue-700 drop-shadow-md">
-              Welcome Back
+              Welcome
             </h2>
             <p className="text-sm mt-2 text-gray-600">
               Log in to your StudyFlow account

@@ -3,159 +3,128 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { useApp } from '@/context/AppContext';
-import { Settings, Target, Download, Upload, Trash2 } from 'lucide-react';
+import { Settings, Target, Activity, LogOut } from 'lucide-react';
 import Sidebar from '@/components/ui/Sidebar';
+import { signOut } from 'next-auth/react';
 
 type Difficulty = 'Easy' | 'Medium' | 'Hard';
 
 type SettingsType = {
-  emailReminders: boolean;
   studyHoursPerDay: number;
   preferredStudyTimes: string[];
   difficultyWeights: Record<Difficulty, number>;
+  dailyGoalHours: number; // new feature
 };
 
 const defaultSettings: SettingsType = {
-  emailReminders: false,
   studyHoursPerDay: 2,
   preferredStudyTimes: [],
   difficultyWeights: { Easy: 1, Medium: 1, Hard: 1 },
+  dailyGoalHours: 4,
 };
 
-export default function SettingsPage() {
-  const {
-    settings,
-    setSettings,
-    tasks,
-    events,
-    modules,
-    subjects,
-    setTasks,
-    setEvents,
-    setModules,
-    setSubjects,
-  } = useApp();
+const LOCAL_STORAGE_KEY = 'studyflow_settings';
 
-  // Safe fallbacks
-  const safeTasks = tasks || [];
-  const safeEvents = events || [];
-  const safeModules = modules || [];
-  const safeSubjects = subjects || [];
+export default function SettingsPage() {
+  const appContext = useApp();
+
+  const { settings: contextSettings, setSettings, tasks = [] } =
+    (appContext || {}) as any;
+
+  // Load settings: context > localStorage > defaults
+  const loadInitialSettings = (): SettingsType => {
+    if (contextSettings) return contextSettings as SettingsType;
+    try {
+      const raw =
+        typeof window !== 'undefined'
+          ? localStorage.getItem(LOCAL_STORAGE_KEY)
+          : null;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.studyHoursPerDay === 'number')
+          return parsed as SettingsType;
+      }
+    } catch {}
+    return defaultSettings;
+  };
 
   const [localSettings, setLocalSettings] = useState<SettingsType>(
-    settings || defaultSettings
+    loadInitialSettings
   );
 
+  // Simulated study progress (based on completed tasks)
+  const completedHours = Math.min(
+    tasks.filter((t: any) => t.completed).length * 0.5,
+    localSettings.dailyGoalHours
+  );
+  const progress =
+    (completedHours / localSettings.dailyGoalHours) * 100 || 0;
+
   useEffect(() => {
-    setLocalSettings(settings || defaultSettings);
-  }, [settings]);
+    if (contextSettings)
+      setLocalSettings(contextSettings as SettingsType);
+  }, [contextSettings]);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localSettings));
+      }
+    } catch {}
+  }, [localSettings]);
 
   const handleSaveSettings = () => {
-    setSettings(localSettings);
+    if (typeof setSettings === 'function') {
+      setSettings(localSettings);
+    }
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localSettings));
     alert('✅ Settings saved successfully!');
   };
 
-  const handleStudyHoursChange = (value: number[]) => {
-    setLocalSettings({ ...localSettings, studyHoursPerDay: value[0] });
-  };
+  const handleStudyHoursChange = (value: number[]) =>
+    setLocalSettings((prev) => ({ ...prev, studyHoursPerDay: value[0] }));
 
   const handleDifficultyWeightChange = (
     difficulty: Difficulty,
     value: number[]
-  ) => {
-    setLocalSettings({
-      ...localSettings,
-      difficultyWeights: {
-        ...localSettings.difficultyWeights,
-        [difficulty]: value[0],
-      },
-    });
-  };
+  ) =>
+    setLocalSettings((prev) => ({
+      ...prev,
+      difficultyWeights: { ...prev.difficultyWeights, [difficulty]: value[0] },
+    }));
 
-  // Export user data to JSON
-  const exportData = () => {
-    const data = {
-      tasks: safeTasks,
-      events: safeEvents,
-      modules: safeModules,
-      subjects: safeSubjects,
-      settings: localSettings,
-      exportDate: new Date().toISOString(),
-    };
-    const dataStr = JSON.stringify(data, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
+  const handleDailyGoalChange = (value: number[]) =>
+    setLocalSettings((prev) => ({ ...prev, dailyGoalHours: value[0] }));
 
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `studyflow-backup-${new Date()
-      .toISOString()
-      .split('T')[0]}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  // Import data from JSON
-  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string);
-        if (data.tasks) setTasks(data.tasks);
-        if (data.events) setEvents(data.events);
-        if (data.modules) setModules(data.modules);
-        if (data.subjects) setSubjects(data.subjects);
-        if (data.settings) {
-          setLocalSettings(data.settings);
-          setSettings(data.settings);
-        }
-        alert('✅ Data imported successfully!');
-      } catch (error) {
-        alert('❌ Error importing data. Please check the file format.');
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const clearAllData = () => {
-    if (
-      confirm(
-        '⚠️ Are you sure you want to clear all data? This action cannot be undone.'
-      )
-    ) {
-      setTasks([]);
-      setEvents([]);
-      setModules([]);
-      setSubjects([]);
-      alert('🗑️ All data has been cleared.');
+  const handleLogout = async () => {
+    try {
+      await signOut({ callbackUrl: '/login' });
+    } catch {
+      window.location.href = '/login';
     }
   };
 
-  const dataStats = {
-    tasks: safeTasks.length,
-    events: safeEvents.length,
-    modules: safeModules.length,
-    subjects: safeSubjects.length,
-  };
+  const motivationalMessage =
+    progress >= 100
+      ? 'Excellent! You reached your study goal today!'
+      : progress >= 50
+      ? 'Keep going! You’re halfway there!'
+      : 'Let’s get started on your goals!';
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 flex">
-      {/* Background image with blur */}
+      {/* Background */}
       <div
         className="absolute inset-0 bg-[url('/studyflow-bg.jpg')] bg-cover bg-center opacity-20 blur-sm"
         aria-hidden="true"
       />
 
-      {/* Sidebar fixed on the left */}
+      {/* Sidebar */}
       <div className="relative z-20 w-64">
         <Sidebar />
       </div>
@@ -167,7 +136,7 @@ export default function SettingsPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
             <p className="text-gray-600">
-              Customize your StudyFlow experience and manage your data.
+              Customize your StudyFlow experience and manage your preferences.
             </p>
           </div>
 
@@ -179,35 +148,13 @@ export default function SettingsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Email Reminders */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="email-reminders">Email Reminders</Label>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Receive email notifications for upcoming events and
-                    deadlines
-                  </p>
-                </div>
-                <Switch
-                  id="email-reminders"
-                  checked={localSettings?.emailReminders ?? false}
-                  onCheckedChange={(checked) =>
-                    setLocalSettings({
-                      ...localSettings,
-                      emailReminders: checked,
-                    })
-                  }
-                />
-              </div>
-
               {/* Study Hours */}
               <div className="space-y-3">
                 <Label>
-                  Study Hours Per Day: {localSettings?.studyHoursPerDay ?? 0}{' '}
-                  hours
+                  Study Hours Per Day: {localSettings.studyHoursPerDay} hours
                 </Label>
                 <Slider
-                  value={[localSettings?.studyHoursPerDay ?? 0]}
+                  value={[localSettings.studyHoursPerDay]}
                   onValueChange={handleStudyHoursChange}
                   max={12}
                   min={1}
@@ -215,7 +162,7 @@ export default function SettingsPage() {
                   className="w-full"
                 />
                 <p className="text-sm text-gray-600">
-                  Set your target daily study hours for better scheduling
+                  Set your daily study target to optimize your schedule.
                 </p>
               </div>
 
@@ -223,7 +170,7 @@ export default function SettingsPage() {
               <div>
                 <Label className="mb-3 block">Preferred Study Times</Label>
                 <div className="flex flex-wrap gap-2">
-                  {localSettings?.preferredStudyTimes?.length ? (
+                  {localSettings.preferredStudyTimes.length ? (
                     localSettings.preferredStudyTimes.map((time, index) => (
                       <Badge key={index} variant="secondary">
                         {time}
@@ -248,16 +195,15 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <p className="text-sm text-gray-600">
-                Adjust how much time multiplier is applied to different
-                difficulty levels
+                Adjust time multipliers for different module difficulties.
               </p>
               {(['Easy', 'Medium', 'Hard'] as const).map((level) => (
                 <div key={level}>
                   <Label>
-                    {level} Modules: {localSettings?.difficultyWeights?.[level]}x
+                    {level} Modules: {localSettings.difficultyWeights[level]}x
                   </Label>
                   <Slider
-                    value={[localSettings?.difficultyWeights?.[level] ?? 1]}
+                    value={[localSettings.difficultyWeights[level]]}
                     onValueChange={(value) =>
                       handleDifficultyWeightChange(level, value)
                     }
@@ -271,81 +217,49 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Data Management */}
+          {/* NEW: Daily Study Goal Tracker */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
-                <Download className="h-5 w-5 mr-2" /> Data Management
+                <Activity className="h-5 w-5 mr-2" /> Daily Study Goal Tracker
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <p className="text-2xl font-bold text-blue-600">
-                    {dataStats.tasks}
-                  </p>
-                  <p className="text-sm text-gray-600">Tasks</p>
-                </div>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">
-                    {dataStats.events}
-                  </p>
-                  <p className="text-sm text-gray-600">Events</p>
-                </div>
-                <div className="text-center p-4 bg-purple-50 rounded-lg">
-                  <p className="text-2xl font-bold text-purple-600">
-                    {dataStats.modules}
-                  </p>
-                  <p className="text-sm text-gray-600">Modules</p>
-                </div>
-                <div className="text-center p-4 bg-orange-50 rounded-lg">
-                  <p className="text-2xl font-bold text-orange-600">
-                    {dataStats.subjects}
-                  </p>
-                  <p className="text-sm text-gray-600">Subjects</p>
-                </div>
-              </div>
+            <CardContent className="space-y-5">
+              <Label>
+                Daily Goal: {localSettings.dailyGoalHours} hours
+              </Label>
+              <Slider
+                value={[localSettings.dailyGoalHours]}
+                onValueChange={handleDailyGoalChange}
+                max={10}
+                min={1}
+                step={0.5}
+                className="w-full"
+              />
 
-              {/* Buttons */}
-              <div className="flex flex-col md:flex-row gap-4">
-                <Button onClick={exportData} className="flex-1">
-                  <Download className="h-4 w-4 mr-2" /> Export Data
-                </Button>
-
-                <div className="flex-1">
-                  <Input
-                    type="file"
-                    accept=".json"
-                    onChange={importData}
-                    className="hidden"
-                    id="import-data"
-                  />
-                  <Button asChild variant="outline" className="w-full">
-                    <Label
-                      htmlFor="import-data"
-                      className="cursor-pointer flex items-center justify-center"
-                    >
-                      <Upload className="h-4 w-4 mr-2" /> Import Data
-                    </Label>
-                  </Button>
-                </div>
-
-                <Button
-                  onClick={clearAllData}
-                  variant="destructive"
-                  className="flex-1"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" /> Clear All Data
-                </Button>
+              <div>
+                <p className="text-sm text-gray-600 mb-2">
+                  Your current progress today:
+                </p>
+                <Progress value={progress} className="h-3" />
+                <p className="text-center text-sm mt-2">{motivationalMessage}</p>
               </div>
             </CardContent>
           </Card>
 
-          {/* Save Button */}
-          <div className="flex justify-end">
-            <Button onClick={handleSaveSettings} size="lg">
+          {/* Save + Logout */}
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-8">
+            <Button onClick={handleSaveSettings} size="lg" className="flex-1">
               Save Settings
+            </Button>
+
+            <Button
+              onClick={handleLogout}
+              size="lg"
+              variant="outline"
+              className="flex-1 text-red-600 border-red-600 hover:bg-red-100"
+            >
+              <LogOut className="h-5 w-5 mr-2" /> Logout
             </Button>
           </div>
         </div>

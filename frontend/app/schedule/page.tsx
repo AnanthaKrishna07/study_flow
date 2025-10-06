@@ -1,9 +1,15 @@
-// app/schedule/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import Sidebar from '@/components/ui/Sidebar';
-import { BookOpen, Plus, Clock, CheckCircle, Calendar } from 'lucide-react';
+import {
+  BookOpen,
+  Plus,
+  Clock,
+  CheckCircle,
+  Calendar,
+  Trash2,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 
+// =================== Types ===================
 type Subject = {
   _id: string;
   name: string;
@@ -43,14 +50,13 @@ type Module = {
   topics: Topic[];
 };
 
+// =================== Component ===================
 export default function SchedulePage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(false);
-  const [newSubject, setNewSubject] = useState({
-    name: '',
-    color: '#3B82F6',
-  });
+  const [addingSubject, setAddingSubject] = useState(false);
+  const [newSubject, setNewSubject] = useState({ name: '', color: '#3B82F6' });
   const [newModule, setNewModule] = useState({
     name: '',
     subjectId: '',
@@ -58,9 +64,13 @@ export default function SchedulePage() {
     estimatedHours: '2',
   });
   const [newTopic, setNewTopic] = useState<
-    Record<string, { title: string; priority: 'Low' | 'Medium' | 'High'; dueDate: string }>
+    Record<
+      string,
+      { title: string; priority: 'Low' | 'Medium' | 'High'; dueDate: string }
+    >
   >({});
 
+  // =================== Fetch Data ===================
   useEffect(() => {
     fetchAll();
   }, []);
@@ -81,44 +91,103 @@ export default function SchedulePage() {
     }
   };
 
+  // =================== Subject Operations ===================
   const addSubject = async () => {
-    if (!newSubject.name) return;
-    const res = await fetch('/api/schedule/subjects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newSubject),
-    });
-    if (res.ok) {
-      const created = await res.json();
-      setSubjects((p) => [...p, created]);
-      setNewSubject({ name: '', color: '#3B82F6' });
+    const trimmedName = newSubject.name.trim();
+    if (!trimmedName) return alert('⚠️ Enter subject name.');
+
+    if (subjects.some((s) => s.name.toLowerCase() === trimmedName.toLowerCase()))
+      return alert('⚠️ Subject with same name exists.');
+    if (subjects.some((s) => s.color.toLowerCase() === newSubject.color.toLowerCase()))
+      return alert('⚠️ This color is already used. Choose another.');
+
+    setAddingSubject(true);
+    try {
+      const res = await fetch('/api/schedule/subjects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...newSubject, name: trimmedName }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setSubjects((p) => [...p, created]);
+        setNewSubject({ name: '', color: '#3B82F6' });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAddingSubject(false);
     }
   };
 
+  const deleteSubject = async (id: string) => {
+    if (!confirm('Delete this subject and all its modules?')) return;
+    try {
+      const res = await fetch('/api/schedule/subjects', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ _id: id }),
+      });
+      if (res.ok) {
+        setSubjects((p) => p.filter((s) => s._id !== id));
+        setModules((p) => p.filter((m) => m.subjectId !== id));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // =================== Module Operations ===================
   const addModule = async () => {
-    if (!newModule.name || !newModule.subjectId) return;
+    if (!newModule.name || !newModule.subjectId)
+      return alert('Fill module details.');
+
+    const duplicate = modules.some(
+      (m) =>
+        m.name.toLowerCase() === newModule.name.trim().toLowerCase() &&
+        ((typeof m.subjectId === 'string' ? m.subjectId : m.subjectId?._id) ===
+          newModule.subjectId)
+    );
+    if (duplicate) return alert('⚠️ Module already exists for this subject.');
+
     const payload = {
-      name: newModule.name,
+      name: newModule.name.trim(),
       subjectId: newModule.subjectId,
       difficulty: newModule.difficulty,
       estimatedHours: Number(newModule.estimatedHours) || 1,
     };
-    const res = await fetch('/api/schedule/modules', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (res.ok) {
-      const created = await res.json();
-      setModules((p) => [...p, created]);
-      setNewModule({
-        name: '',
-        subjectId: '',
-        difficulty: 'Medium',
-        estimatedHours: '2',
+    try {
+      const res = await fetch('/api/schedule/modules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
-    } else {
-      console.error('Failed to add module', await res.text());
+      if (res.ok) {
+        const created = await res.json();
+        setModules((p) => [...p, created]);
+        setNewModule({
+          name: '',
+          subjectId: '',
+          difficulty: 'Medium',
+          estimatedHours: '2',
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const deleteModule = async (id: string) => {
+    if (!confirm('Delete this module?')) return;
+    try {
+      const res = await fetch('/api/schedule/modules', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ _id: id }),
+      });
+      if (res.ok) setModules((p) => p.filter((m) => m._id !== id));
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -134,9 +203,10 @@ export default function SchedulePage() {
     }
   };
 
+  // =================== Topic Operations ===================
   const addTopic = async (moduleId: string) => {
     const data = newTopic[moduleId];
-    if (!data || !data.title) return;
+    if (!data?.title) return;
     const payload = { _id: moduleId, newTopic: { ...data, completed: false } };
     const res = await fetch('/api/schedule/modules', {
       method: 'PUT',
@@ -146,10 +216,24 @@ export default function SchedulePage() {
     if (res.ok) {
       const updated = await res.json();
       setModules((p) => p.map((m) => (m._id === moduleId ? updated : m)));
-      setNewTopic((prev) => ({
-        ...prev,
+      setNewTopic((p) => ({
+        ...p,
         [moduleId]: { title: '', priority: 'Medium', dueDate: '' },
       }));
+    }
+  };
+
+  const deleteTopic = async (moduleId: string, topicId: string) => {
+    if (!confirm('Delete this topic?')) return;
+    const payload = { _id: moduleId, deleteTopic: topicId };
+    const res = await fetch('/api/schedule/modules', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setModules((p) => p.map((m) => (m._id === moduleId ? updated : m)));
     }
   };
 
@@ -170,6 +254,7 @@ export default function SchedulePage() {
     }
   };
 
+  // =================== Helpers ===================
   const getBadgeColor = (level: string) =>
     level === 'Easy'
       ? 'bg-purple-100 text-purple-700'
@@ -184,10 +269,12 @@ export default function SchedulePage() {
       ? 'bg-yellow-100 text-yellow-700'
       : 'bg-green-100 text-green-700';
 
+  // =================== JSX ===================
   return (
     <div className="flex relative min-h-screen">
       <Sidebar />
 
+      {/* Background */}
       <div className="absolute inset-0">
         <img src="/images/aaa.jpg" alt="bg" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-white/70 backdrop-blur-md"></div>
@@ -199,7 +286,7 @@ export default function SchedulePage() {
           <h1 className="text-4xl font-extrabold text-gray-900">Study Schedule</h1>
         </div>
 
-        {/* 🔹 Subject Overview Section */}
+        {/* =================== SUBJECT OVERVIEW =================== */}
         <section className="bg-white/90 rounded-xl p-6 shadow-sm">
           <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
             <BookOpen className="w-6 h-6 text-blue-500" /> Subject Overview
@@ -210,17 +297,18 @@ export default function SchedulePage() {
           ) : (
             <div className="space-y-6">
               {subjects.map((s) => {
-                const sModules = modules.filter((m) => {
-                  const sid =
-                    typeof m.subjectId === 'string'
-                      ? m.subjectId
-                      : m.subjectId?._id;
-                  return sid === s._id;
-                });
+                const sModules = modules.filter((m) =>
+                  typeof m.subjectId === 'string'
+                    ? m.subjectId === s._id
+                    : m.subjectId?._id === s._id
+                );
 
                 return (
-                  <div key={s._id} className="border rounded-lg p-4 bg-gray-50">
-                    <div className="flex justify-between items-center mb-2">
+                  <div
+                    key={s._id}
+                    className="border rounded-lg p-4 bg-gray-50 shadow-sm hover:shadow-md transition"
+                  >
+                    <div className="flex justify-between items-center mb-3">
                       <h3 className="font-semibold text-lg flex items-center gap-2">
                         <span
                           style={{ background: s.color }}
@@ -228,30 +316,51 @@ export default function SchedulePage() {
                         />
                         {s.name}
                       </h3>
-                      <span className="text-sm text-gray-500">
-                        {sModules.length} modules
-                      </span>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => deleteSubject(s._id)}
+                        className="flex items-center gap-1 bg-red-600 text-white hover:bg-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" /> Delete
+                      </Button>
                     </div>
 
                     {sModules.length === 0 ? (
                       <p className="text-sm text-gray-500 pl-2">No modules yet.</p>
                     ) : (
-                      <ul className="pl-4 space-y-1">
+                      <ul className="pl-4 space-y-3">
                         {sModules.map((m) => (
                           <li
                             key={m._id}
-                            className="flex justify-between items-center border-b border-gray-200 pb-1"
+                            className="border-b border-gray-200 pb-2 last:border-0"
                           >
-                            <span className="text-gray-700 text-sm">{m.name}</span>
-                            <span
-                              className={`text-xs font-medium ${
-                                m.completed
-                                  ? 'text-green-600'
-                                  : 'text-yellow-600'
-                              }`}
-                            >
-                              {m.completed ? '✅ Completed' : '⏳ In Progress'}
-                            </span>
+                            <div className="flex justify-between items-center">
+                              <strong className="text-gray-800">{m.name}</strong>
+                              <span className="text-xs text-gray-500">
+                                {m.topics.filter((t) => t.completed).length}/
+                                {m.topics.length} topics done
+                              </span>
+                            </div>
+
+                            {m.topics.length > 0 ? (
+                              <ul className="pl-4 mt-1 space-y-1">
+                                {m.topics.map((t) => (
+                                  <li
+                                    key={t._id ?? `${m._id}-topic-${t.title}`}
+                                    className={`text-sm flex items-center gap-2 ${
+                                      t.completed ? 'text-green-700' : 'text-gray-600'
+                                    }`}
+                                  >
+                                    {t.completed ? '✅' : '⏳'} {t.title}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-xs text-gray-400 pl-4">
+                                No topics yet.
+                              </p>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -263,8 +372,9 @@ export default function SchedulePage() {
           )}
         </section>
 
-        {/* 🔹 Add Subject & Module */}
+        {/* =================== ADD SUBJECT / MODULE =================== */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Add Subject */}
           <Card className="bg-white/90">
             <CardHeader>
               <CardTitle>
@@ -283,12 +393,17 @@ export default function SchedulePage() {
                 value={newSubject.color}
                 onChange={(e) => setNewSubject((p) => ({ ...p, color: e.target.value }))}
               />
-              <Button onClick={addSubject} className="bg-blue-600 text-white w-full">
-                Add
+              <Button
+                onClick={addSubject}
+                disabled={addingSubject}
+                className="bg-blue-600 text-white w-full disabled:opacity-50"
+              >
+                {addingSubject ? 'Adding...' : 'Add Subject'}
               </Button>
             </CardContent>
           </Card>
 
+          {/* Add Module */}
           <Card className="bg-white/90">
             <CardHeader>
               <CardTitle>
@@ -299,7 +414,8 @@ export default function SchedulePage() {
               <Label>Subject</Label>
               <Select
                 value={newModule.subjectId}
-                onValueChange={(v) => setNewModule((p) => ({ ...p, subjectId: v }))}>
+                onValueChange={(v) => setNewModule((p) => ({ ...p, subjectId: v }))}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose subject" />
                 </SelectTrigger>
@@ -321,7 +437,8 @@ export default function SchedulePage() {
               <Label>Difficulty</Label>
               <Select
                 value={newModule.difficulty}
-                onValueChange={(v) => setNewModule((p) => ({ ...p, difficulty: v as any }))}>
+                onValueChange={(v) => setNewModule((p) => ({ ...p, difficulty: v as any }))}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -332,7 +449,7 @@ export default function SchedulePage() {
                 </SelectContent>
               </Select>
 
-              <Label>Hours</Label>
+              <Label>Estimated Hours</Label>
               <Input
                 type="number"
                 min={1}
@@ -342,13 +459,13 @@ export default function SchedulePage() {
                 }
               />
               <Button onClick={addModule} className="bg-purple-600 text-white w-full">
-                Add
+                Add Module
               </Button>
             </CardContent>
           </Card>
         </section>
 
-        {/* 🔹 Subjects & Modules */}
+        {/* =================== MODULES & TOPICS =================== */}
         <section className="space-y-6">
           {loading ? (
             <p>Loading...</p>
@@ -356,19 +473,11 @@ export default function SchedulePage() {
             <Card className="bg-white/80 p-10 text-center">No subjects yet.</Card>
           ) : (
             subjects.map((s) => {
-              const sModules = modules.filter((m) => {
-                const sid =
-                  typeof m.subjectId === 'string'
-                    ? m.subjectId
-                    : m.subjectId?._id;
-                return sid === s._id;
-              });
-
-              const completed = sModules.filter((m) => m.completed).length;
-              const progress = sModules.length
-                ? Math.round((completed / sModules.length) * 100)
-                : 0;
-
+              const sModules = modules.filter((m) =>
+                typeof m.subjectId === 'string'
+                  ? m.subjectId === s._id
+                  : m.subjectId?._id === s._id
+              );
               return (
                 <Card key={s._id} className="bg-white/90 p-4">
                   <CardHeader className="flex justify-between">
@@ -379,9 +488,7 @@ export default function SchedulePage() {
                       />{' '}
                       {s.name}
                     </CardTitle>
-                    <span>{progress}% complete</span>
                   </CardHeader>
-
                   <CardContent className="space-y-6">
                     {sModules.length === 0 ? (
                       <p className="text-gray-500 text-sm">No modules yet.</p>
@@ -390,18 +497,29 @@ export default function SchedulePage() {
                         <div key={m._id} className="p-4 rounded border bg-gray-50">
                           <div className="flex justify-between items-center mb-2">
                             <h4 className="font-semibold">{m.name}</h4>
-                            <Badge className={getBadgeColor(m.difficulty)}>
-                              {m.difficulty}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge className={getBadgeColor(m.difficulty)}>
+                                {m.difficulty}
+                              </Badge>
+                              <Button
+                                size="sm"
+                                onClick={() => deleteModule(m._id)}
+                                className="bg-red-600 text-white hover:bg-red-700"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
 
                           <p className="text-sm text-gray-600 flex items-center gap-1">
                             <Clock className="w-4 h-4" /> {m.estimatedHours} hrs
                           </p>
 
-                          {/* 🔸 Topics List */}
+                          {/* Topics List */}
                           <div className="mt-4 space-y-2">
-                            <h5 className="font-medium text-sm text-gray-700">Topics</h5>
+                            <h5 className="font-medium text-sm text-gray-700">
+                              Topics
+                            </h5>
                             {m.topics.length === 0 ? (
                               <p className="text-xs text-gray-500">No topics yet.</p>
                             ) : (
@@ -449,13 +567,20 @@ export default function SchedulePage() {
                                     >
                                       <CheckCircle className="w-4 h-4" />
                                     </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => deleteTopic(m._id, t._id ?? '')}
+                                      className="bg-red-600 text-white hover:bg-red-700"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
                                   </div>
                                 </div>
                               ))
                             )}
                           </div>
 
-                          {/* 🔸 Add Topic */}
+                          {/* Add Topic */}
                           <div className="mt-3 space-y-2">
                             <Input
                               placeholder="Topic title"
@@ -464,7 +589,10 @@ export default function SchedulePage() {
                                 setNewTopic((p) => ({
                                   ...p,
                                   [m._id]: {
-                                    ...(p[m._id] || { priority: 'Medium', dueDate: '' }),
+                                    ...(p[m._id] || {
+                                      priority: 'Medium',
+                                      dueDate: '',
+                                    }),
                                     title: e.target.value,
                                   },
                                 }))
@@ -518,7 +646,7 @@ export default function SchedulePage() {
                             </Button>
                           </div>
 
-                          {/* 🔸 Mark Module complete */}
+                          {/* Mark Complete */}
                           <div className="mt-3">
                             <Button
                               onClick={() =>

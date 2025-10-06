@@ -1,4 +1,3 @@
-// app/events/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -9,9 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Calendar, Plus, Bell, Trash2, Clock, Send } from 'lucide-react';
+import { Calendar, Plus, Trash2, Clock } from 'lucide-react';
 
 type EventType = {
   _id?: string;
@@ -22,14 +20,11 @@ type EventType = {
   type?: 'Exam' | 'Meeting' | 'Placement' | 'Deadline' | 'Other';
   location?: string;
   meetLink?: string;
-  reminderEnabled?: boolean;
 };
 
 export default function EventsPage() {
   const [events, setEvents] = useState<EventType[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [reminderMessage, setReminderMessage] = useState<string | null>(null);
-
   const [newEvent, setNewEvent] = useState({
     title: '',
     description: '',
@@ -38,7 +33,6 @@ export default function EventsPage() {
     type: 'Exam' as EventType['type'],
     location: '',
     meetLink: '',
-    reminderEnabled: true,
   });
 
   useEffect(() => {
@@ -87,7 +81,6 @@ export default function EventsPage() {
         type: 'Exam',
         location: '',
         meetLink: '',
-        reminderEnabled: true,
       });
     } catch (err) {
       console.error('Add event error:', err);
@@ -112,21 +105,6 @@ export default function EventsPage() {
     }
   };
 
-  const sendReminders = async () => {
-    try {
-      const res = await fetch('/api/reminders');
-      const data = await res.json();
-      if (res.ok) {
-        setReminderMessage(`✅ ${data.count} reminders sent!`);
-      } else {
-        setReminderMessage(`❌ ${data.message}`);
-      }
-    } catch (err) {
-      setReminderMessage('❌ Failed to send reminders.');
-    }
-    setTimeout(() => setReminderMessage(null), 4000);
-  };
-
   const upcoming = events.filter((ev) => new Date(ev.dateTime) >= new Date());
   const past = events.filter((ev) => new Date(ev.dateTime) < new Date());
 
@@ -146,103 +124,86 @@ export default function EventsPage() {
             <p className="text-gray-700">Track exams, meetings, placements, and deadlines with ease.</p>
           </div>
 
-          <div className="flex gap-3">
-            <Button
-              onClick={sendReminders}
-              variant="outline"
-              className="flex items-center gap-2 text-purple-700 border-purple-600"
-            >
-              <Send className="h-4 w-4" /> Send Reminders
-            </Button>
-
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-md">
-                  <Plus className="h-4 w-4 mr-2" /> Add Event
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md bg-white text-black border border-gray-200">
-                <DialogHeader>
-                  <DialogTitle className="text-xl font-bold">Add New Event</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <Label>Title</Label>
-                  <Input
-                    value={newEvent.title}
-                    onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                    placeholder="Event title..."
-                  />
-                  <Label>Description</Label>
-                  <Textarea
-                    value={newEvent.description}
-                    onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                    rows={3}
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Date</Label>
-                      <Input
-                        type="date"
-                        value={(newEvent as any).date || ''}
-                        onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Time</Label>
-                      <Input
-                        type="time"
-                        value={newEvent.time}
-                        onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <Label>Event Type</Label>
-                  <Select value={newEvent.type} onValueChange={(val) => setNewEvent({ ...newEvent, type: val as any })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Exam">Exam</SelectItem>
-                      <SelectItem value="Meeting">Meeting</SelectItem>
-                      <SelectItem value="Placement">Placement</SelectItem>
-                      <SelectItem value="Deadline">Deadline</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Label>Location</Label>
-                  <Input
-                    value={newEvent.location}
-                    onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
-                  />
-                  <Label>Meet Link</Label>
-                  <Input
-                    value={newEvent.meetLink}
-                    onChange={(e) => setNewEvent({ ...newEvent, meetLink: e.target.value })}
-                  />
-                  <div className="flex items-center justify-between">
-                    <Label>Enable Reminders</Label>
-                    <Switch
-                      checked={newEvent.reminderEnabled}
-                      onCheckedChange={(checked) => setNewEvent({ ...newEvent, reminderEnabled: checked as boolean })}
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-md">
+                <Plus className="h-4 w-4 mr-2" /> Add Event
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md bg-white text-black border border-gray-200">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold">Add New Event</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <Label>Title</Label>
+                <Input
+                  value={newEvent.title}
+                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                  placeholder="Event title..."
+                />
+                <Label>Description</Label>
+                <Textarea
+                  value={newEvent.description}
+                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                  rows={3}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Date</Label>
+                    <Input
+                      type="date"
+                      value={(newEvent as any).date || ''}
+                      onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
                     />
                   </div>
-                  <Button onClick={handleAddEvent} className="w-full bg-purple-600 hover:bg-purple-700 text-white">
-                    Add Event
-                  </Button>
+                  <div>
+                    <Label>Time</Label>
+                    <Input
+                      type="time"
+                      value={newEvent.time}
+                      onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                    />
+                  </div>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+                <Label>Event Type</Label>
+                <Select
+                  value={newEvent.type}
+                  onValueChange={(val) => setNewEvent({ ...newEvent, type: val as any })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Exam">Exam</SelectItem>
+                    <SelectItem value="Meeting">Meeting</SelectItem>
+                    <SelectItem value="Placement">Placement</SelectItem>
+                    <SelectItem value="Deadline">Deadline</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Label>Location</Label>
+                <Input
+                  value={newEvent.location}
+                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                />
+                <Label>Meet Link</Label>
+                <Input
+                  value={newEvent.meetLink}
+                  onChange={(e) => setNewEvent({ ...newEvent, meetLink: e.target.value })}
+                />
+                <Button
+                  onClick={handleAddEvent}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  Add Event
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        {reminderMessage && (
-          <div className="p-3 rounded bg-purple-100 text-purple-800 font-medium shadow-md">
-            {reminderMessage}
-          </div>
-        )}
-
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="bg-white/80 backdrop-blur-sm shadow-lg">
             <CardContent className="p-6 flex items-center">
               <Calendar className="h-8 w-8 text-blue-600 mr-3" />
@@ -261,15 +222,6 @@ export default function EventsPage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white/80 backdrop-blur-sm shadow-lg">
-            <CardContent className="p-6 flex items-center">
-              <Bell className="h-8 w-8 text-purple-600 mr-3" />
-              <div>
-                <p className="text-2xl font-bold">{events.filter((e) => e.reminderEnabled).length}</p>
-                <p className="text-sm text-gray-700">With Reminders</p>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Upcoming */}
@@ -281,7 +233,10 @@ export default function EventsPage() {
             </Card>
           ) : (
             upcoming.map((ev) => (
-              <Card key={ev._id} className="bg-white/90 p-4 hover:shadow-md flex justify-between items-start">
+              <Card
+                key={ev._id}
+                className="bg-white/90 p-4 hover:shadow-md flex justify-between items-start"
+              >
                 <div>
                   <h3 className="text-lg font-semibold">{ev.title}</h3>
                   <p className="text-sm text-gray-600">

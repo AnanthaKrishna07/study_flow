@@ -5,14 +5,14 @@ import Module from "@/models/Module";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-// helper: ensure authentication
+
 async function ensureAuth() {
   const session = await getServerSession(authOptions);
   if (!session || !session.user || !(session.user as any).id) return null;
   return session;
 }
 
-// helper: recalc subject progress
+
 async function recalcSubjectProgress(subjectId: string) {
   const subjectModules = await Module.find({ subjectId }).lean();
   const totalModules = subjectModules.length;
@@ -21,7 +21,7 @@ async function recalcSubjectProgress(subjectId: string) {
   await Subject.findByIdAndUpdate(subjectId, { totalModules, completedModules });
 }
 
-// ✅ GET subject with its modules + topics
+
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
@@ -56,7 +56,7 @@ export async function GET(
   }
 }
 
-// ✅ PUT update subject
+
 export async function PUT(
   req: Request,
   { params }: { params: { id: string } }
@@ -89,7 +89,7 @@ export async function PUT(
   }
 }
 
-// ✅ DELETE subject + its modules
+
 export async function DELETE(
   req: Request,
   { params }: { params: { id: string } }
@@ -110,7 +110,7 @@ export async function DELETE(
       return NextResponse.json({ message: "Subject not found" }, { status: 404 });
     }
 
-    // also delete related modules
+   
     await Module.deleteMany({ subjectId: params.id });
 
     return NextResponse.json({ message: "Subject and related modules deleted successfully" });

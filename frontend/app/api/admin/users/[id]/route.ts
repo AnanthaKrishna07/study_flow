@@ -3,12 +3,11 @@ import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
 import bcrypt from "bcryptjs";
 
-interface Params {
-  params: { id: string };
-}
-
 // ✅ Update User
-export async function PUT(req: Request, { params }: Params) {
+export async function PUT(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     await dbConnect();
     const { id } = params;
@@ -38,7 +37,10 @@ export async function PUT(req: Request, { params }: Params) {
 }
 
 // ✅ Delete User
-export async function DELETE(req: Request, { params }: Params) {
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     await dbConnect();
     const { id } = params;

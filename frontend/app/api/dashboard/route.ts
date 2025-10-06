@@ -20,20 +20,20 @@ export async function GET() {
     await dbConnect();
     const userId = (session.user as any).id;
 
-    // ✅ Fetch tasks, events, modules together
+
     const [allTasks, allEvents, allModules] = await Promise.all([
       Task.find({ userId }).sort({ dueDate: 1 }).lean(),
       Event.find({ userId }).sort({ dateTime: 1 }).lean(),
       Module.find({ userId }).lean(),
     ]);
 
-    // Dates for today / tomorrow
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // ✅ Task stats
+
     const totalTasks = allTasks.length;
     const completedTasks = allTasks.filter((t) => t.completed).length;
     const todayTasks = allTasks.filter(
@@ -43,12 +43,12 @@ export async function GET() {
         new Date(t.dueDate) < tomorrow
     ).length;
 
-    // ✅ Event stats
+  
     const upcomingEvents = allEvents.filter(
       (e) => e.dateTime && new Date(e.dateTime) >= today
     ).length;
 
-    // ✅ Module stats
+
     const totalModules = allModules.length;
     const completedModules = allModules.filter((m) => m.completed).length;
 

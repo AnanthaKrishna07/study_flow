@@ -4,11 +4,10 @@ import Task from "@/models/Task";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-type Params = {
-  params: { id: string };
-};
-
-export async function PUT(req: Request, { params }: Params) {
+export async function PUT(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     await dbConnect();
     const session = await getServerSession(authOptions);
@@ -42,14 +41,14 @@ export async function PUT(req: Request, { params }: Params) {
     return NextResponse.json(updated);
   } catch (err) {
     console.error("PUT task error:", err);
-    return NextResponse.json(
-      { message: "Error updating task" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Error updating task" }, { status: 500 });
   }
 }
 
-export async function DELETE(req: Request, { params }: Params) {
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     await dbConnect();
     const session = await getServerSession(authOptions);
@@ -70,9 +69,6 @@ export async function DELETE(req: Request, { params }: Params) {
     return NextResponse.json({ message: "Task deleted successfully" });
   } catch (err) {
     console.error("DELETE task error:", err);
-    return NextResponse.json(
-      { message: "Error deleting task" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Error deleting task" }, { status: 500 });
   }
 }

@@ -35,7 +35,7 @@ export default function RegisterPage() {
       if (!res.ok) throw new Error(data.message || 'Registration failed');
 
       console.log('User registered:', data);
-      router.push('/login'); // redirect after registration
+      router.push('/login'); 
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -72,7 +72,7 @@ export default function RegisterPage() {
               <label className="block text-sm font-medium text-gray-700">Full Name</label>
               <input
                 type="text"
-                placeholder="John Doe"
+                placeholder="Full name"
                 className="w-full mt-1 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-black"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
